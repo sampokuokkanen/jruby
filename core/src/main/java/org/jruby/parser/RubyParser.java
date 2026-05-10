@@ -17,7 +17,7 @@
  * rights and limitations under the License.
  *
  * Copyright (C) 2008-2017 Thomas E Enebo <enebo@acm.org>
- * 
+ *
  * Alternatively, the contents of this file may be used under the terms of
  * either of the GNU General Public License Version 2 or later (the "GPL"),
  * or the GNU Lesser General Public License Version 2.1 or later (the "LGPL"),
@@ -81,7 +81,7 @@ import static org.jruby.lexer.LexingCommon.MINUS;
 import static org.jruby.lexer.LexingCommon.MINUS_AT;
 import static org.jruby.lexer.LexingCommon.PERCENT;
 import static org.jruby.lexer.LexingCommon.OR;
-import static org.jruby.lexer.LexingCommon.OR_KEYWORD; 
+import static org.jruby.lexer.LexingCommon.OR_KEYWORD;
 import static org.jruby.lexer.LexingCommon.OR_OR;
 import static org.jruby.lexer.LexingCommon.PLUS;
 import static org.jruby.lexer.LexingCommon.RBRACKET;
@@ -103,7 +103,7 @@ import static org.jruby.util.CommonByteLists.FWD_ALL;
 import static org.jruby.util.CommonByteLists.FWD_BLOCK;
 import static org.jruby.util.CommonByteLists.FWD_REST;
 import static org.jruby.util.CommonByteLists.FWD_KWREST;
- 
+
  public class RubyParser extends RubyParserBase {
     public RubyParser(Ruby runtime, LexerSource source, DynamicScope scope, org.jruby.parser.ParserType type) {
         super(runtime, source, scope, type);
@@ -916,7 +916,7 @@ import static org.jruby.util.CommonByteLists.FWD_KWREST;
       @see #yyExpecting
     */
   protected static final String[] yyNames = {
-    "end-of-file",null,null,null,null,null,null,null,null,"escaped horizontal tab","'\\n'",
+    "end-of-input",null,null,null,null,null,null,null,null,"escaped horizontal tab","'\\n'",
 "escaped vertical tab","escaped form feed","escaped carriage return",null,null,null,null,null,null,null,null,null,
     null,null,null,null,null,null,null,null,null,"' '","'!'",null,null,
     null,"'%'","'&'",null,"'('","')'","'*'","'+'","','","'-'","'.'","'/'",
@@ -1934,7 +1934,7 @@ import static org.jruby.util.CommonByteLists.FWD_KWREST;
                 yyn = yyTable[yyn];			// reduce (yyn)
             } else {
                 switch (yyErrorFlag) {
-  
+
                 case 0:
                     yyerror("syntax error", yyExpecting(yystate), yyNames[yytoken]);
                     if (yydebug != null) yydebug.error("syntax error");
@@ -1960,7 +1960,7 @@ import static org.jruby.util.CommonByteLists.FWD_KWREST;
                 case 3:
                     if (yytoken == 0) {
                         if (yydebug != null) yydebug.reject();
-                        yyerror("irrecoverable syntax error at end-of-file");
+                        yyerror("irrecoverable syntax error at end-of-input");
                     }
                     if (yydebug != null) yydebug.discard(yystate, yytoken, yyName(yytoken), yyLex.value());
                     yytoken = NEEDS_TOKEN;
@@ -2380,7 +2380,7 @@ states[54] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, i
                     p.restore_defun(((DefHolder)yyVals[-3+yyTop].value));
                     /*%%%*/
                     yyVal = new DefsNode(((DefHolder)yyVals[-3+yyTop].value).line, (Node) ((DefHolder)yyVals[-3+yyTop].value).singleton, ((DefHolder)yyVals[-3+yyTop].value).name, ((ArgsNode)yyVals[-2+yyTop].value), p.getCurrentScope(), p.reduce_nodes(p.remove_begin(((Node)yyVals[0+yyTop].value))), yyVals[yyTop - count + 4].end());
-                    /*% %*/                    
+                    /*% %*/
                     /*% ripper: defs!(AREF($1, 0), AREF($1, 1), AREF($1, 2), $2, bodystmt!($4, Qnil, Qnil, Qnil)) %*/
                     p.popCurrentScope();
   return yyVal;
@@ -2484,7 +2484,7 @@ states[72] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, i
   return yyVal;
 };
 states[73] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
-                    p.setState(EXPR_FNAME); 
+                    p.setState(EXPR_FNAME);
                     LexContext ctxt = p.getLexContext();
                     ctxt.in_argdef = true;
   return yyVal;
@@ -2933,7 +2933,7 @@ states[138] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
                     /*%
                       $$ = p.assignable(yyVals[yyTop - count + 1].id, p.var_field($1));
                     %*/
-                    
+
   return yyVal;
 };
 states[139] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
@@ -3521,7 +3521,7 @@ states[252] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
                     /*%%%*/
                     p.value_expr(((Node)yyVals[-2+yyTop].value));
                     p.value_expr(((Node)yyVals[0+yyTop].value));
-    
+
                     boolean isLiteral = ((Node)yyVals[-2+yyTop].value) instanceof FixnumNode && ((Node)yyVals[0+yyTop].value) instanceof FixnumNode;
                     yyVal = new DotNode(yyVals[yyTop - count + 1].start(), p.makeNullNil(((Node)yyVals[-2+yyTop].value)), p.makeNullNil(((Node)yyVals[0+yyTop].value)), false, isLiteral);
                     /*% %*/
@@ -3678,7 +3678,7 @@ states[282] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
   return yyVal;
 };
 states[283] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
-                    p.getLexContext().in_defined = false;                    
+                    p.getLexContext().in_defined = false;
                     yyVal = p.new_defined(yyVals[yyTop - count + 1].start(), ((Node)yyVals[0+yyTop].value));
   return yyVal;
 };
@@ -3930,7 +3930,7 @@ states[325] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
                     case tLBRACE_ARG:
                        lookahead = true;
                     }
-                      
+
                     if (lookahead) cmdarg.pop();
                     cmdarg.pop();
                     if (lookahead) cmdarg.push0();
@@ -4094,7 +4094,7 @@ states[353] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
   return yyVal;
 };
 states[354] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
-                    p.setState(EXPR_ENDARG); 
+                    p.setState(EXPR_ENDARG);
   return yyVal;
 };
 states[355] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
@@ -4195,14 +4195,14 @@ states[367] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
 states[368] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
                     /*%%%*/
                     p.frobnicate_fcall_args(((FCallNode)yyVals[-1+yyTop].value), null, ((IterNode)yyVals[0+yyTop].value));
-                    yyVal = ((FCallNode)yyVals[-1+yyTop].value);                    
+                    yyVal = ((FCallNode)yyVals[-1+yyTop].value);
                     /*% %*/
                     /*% ripper: method_add_block!(method_add_arg!(fcall!($1), args_new!), $2) %*/
   return yyVal;
 };
 states[370] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
                     /*%%%*/
-                    if (((Node)yyVals[-1+yyTop].value) != null && 
+                    if (((Node)yyVals[-1+yyTop].value) != null &&
                           ((BlockAcceptingNode)yyVals[-1+yyTop].value).getIterNode() instanceof BlockPassNode) {
                           p.compile_error("both block arg and actual block given.");
                     }
@@ -4364,7 +4364,7 @@ states[391] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
                     yyVal = new DefsNode(((DefHolder)yyVals[-4+yyTop].value).line, (Node) ((DefHolder)yyVals[-4+yyTop].value).singleton, ((DefHolder)yyVals[-4+yyTop].value).name, ((ArgsNode)yyVals[-3+yyTop].value), p.getCurrentScope(), body, yyVals[yyTop - count + 4].end());
                     if (p.isNextBreak) ((DefsNode)yyVal).setContainsNextBreak();
                     /* Changed from MRI (no more get_value)*/
-                    /*% %*/                    
+                    /*% %*/
                     /*% ripper: defs!(AREF($1, 0), AREF($1, 1), AREF($1, 2), $2, $4) %*/
                     p.popCurrentScope();
   return yyVal;
@@ -4460,7 +4460,7 @@ states[404] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
   return yyVal;
 };
 states[405] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
-                    yyVal = (LexContext) p.getLexContext().clone();  
+                    yyVal = (LexContext) p.getLexContext().clone();
                     p.getLexContext().in_rescue = LexContext.InRescue.BEFORE_RESCUE;
   return yyVal;
 };
@@ -4999,7 +4999,7 @@ states[504] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
                     /*% %*/
                     /*% ripper: brace_block!(escape_Qundef($6), $7) %*/
                     p.numparam_pop(((Node)yyVals[-4+yyTop].value));
-                    p.popCurrentScope();                    
+                    p.popCurrentScope();
   return yyVal;
 };
 states[505] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
@@ -5250,7 +5250,7 @@ states[554] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
                     ListNode preArgs = p.newArrayNode(yyVals[yyTop - count + 1].start(), ((Node)yyVals[0+yyTop].value));
                     yyVal = p.new_array_pattern_tail(yyVals[yyTop - count + 1].start(), preArgs, false, null, null);
                     /* JRuby Changed*/
-                    /*% 
+                    /*%
                         $$ = p.new_array_pattern_tail(yyVals[yyTop - count + 1].start(), p.new_array($1), false, null, null);
                     %*/
   return yyVal;
@@ -5630,7 +5630,7 @@ states[618] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
   return yyVal;
 };
 states[619] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
-                    yyVal = null; 
+                    yyVal = null;
   return yyVal;
 };
 states[620] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
@@ -5865,7 +5865,7 @@ states[657] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
                     /*%%%*/
                     yyVal = p.literal_concat(((Node)yyVals[-1+yyTop].value), ((Node)yyVals[0+yyTop].value));
                     /* JRuby changed*/
-                    /*% 
+                    /*%
 			$$ = p.dispatch("on_regexp_add", $1, $2);
                     %*/
   return yyVal;
@@ -5966,7 +5966,7 @@ states[675] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
   return yyVal;
 };
 states[676] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
-                    yyVal = ((NumericNode)yyVals[0+yyTop].value);  
+                    yyVal = ((NumericNode)yyVals[0+yyTop].value);
   return yyVal;
 };
 states[677] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
@@ -6114,7 +6114,7 @@ states[697] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
                     /*%
                       $$ = p.assignable(yyVals[yyTop - count + 1].id, p.var_field($1));
                     %*/
-                    
+
   return yyVal;
 };
 states[698] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
@@ -6241,7 +6241,7 @@ states[713] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
 };
 states[715] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
                     p.getLexContext().in_argdef = false;
-                    yyVal = p.new_args(yyVals[yyTop - count + 1].start(), null, null, null, null, 
+                    yyVal = p.new_args(yyVals[yyTop - count + 1].start(), null, null, null, null,
                                     p.new_args_tail(p.src_line(), null, (ByteList) null, (ByteList) null));
   return yyVal;
 };
@@ -6654,7 +6654,7 @@ states[781] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
                     /*%%%*/
                     yyVal = new BlockArgNode(((ArgumentNode)yyVal));
                     /* Changed from MRI*/
-                    /*% 
+                    /*%
                         $$ = p.dispatch("on_blockarg", p.nil());
                     %*/
   return yyVal;

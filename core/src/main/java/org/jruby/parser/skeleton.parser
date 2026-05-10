@@ -196,7 +196,7 @@ t                if (yydebug != null) yydebug.shift(yystate, yyTable[yyn], yyErr
 .                yyn = yyTable[yyn];			// reduce (yyn)
 .            } else {
 .                switch (yyErrorFlag) {
-.  
+.
 .                case 0:
 .                    yyerror("syntax error", yyExpecting(yystate), yyNames[yytoken]);
 t                    if (yydebug != null) yydebug.error("syntax error");
@@ -222,7 +222,7 @@ t                    if (yydebug != null) yydebug.reject();
 .                case 3:
 .                    if (yytoken == 0) {
 t                        if (yydebug != null) yydebug.reject();
-.                        yyerror("irrecoverable syntax error at end-of-file");
+.                        yyerror("irrecoverable syntax error at end-of-input");
 .                    }
 t                    if (yydebug != null) yydebug.discard(yystate, yytoken, yyName(yytoken), yyLex.value());
 .                    yytoken = NEEDS_TOKEN;
