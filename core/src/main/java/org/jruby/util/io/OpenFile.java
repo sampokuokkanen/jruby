@@ -171,6 +171,8 @@ public class OpenFile implements Finalizable {
     private final Ruby runtime;
 
     protected volatile Set<RubyThread> blockingThreads;
+    // fibers parked in a fiber scheduler's io_wait on this IO. MRI: rb_io's blocking_operations
+    private volatile Set<SchedulerWaiter> schedulerWaiters;
 
     private final Ptr spPtr = new Ptr();
     private final Ptr dpPtr = new Ptr();
@@ -2931,10 +2933,70 @@ public class OpenFile implements Finalizable {
         }
     }
 
+    public static final class SchedulerWaiter {
+        final IRubyObject scheduler;
+        final IRubyObject fiber;
+
+        SchedulerWaiter(IRubyObject scheduler, IRubyObject fiber) {
+            this.scheduler = scheduler;
+            this.fiber = fiber;
+        }
+    }
+
+    /**
+     * Record a fiber waiting on this IO through the fiber scheduler, so closing the IO can interrupt it.
+     */
+    public SchedulerWaiter addSchedulerWaiter(IRubyObject scheduler, IRubyObject fiber) {
+        Set<SchedulerWaiter> schedulerWaiters = this.schedulerWaiters;
+
+        if (schedulerWaiters == null) {
+            synchronized (this) {
+                schedulerWaiters = this.schedulerWaiters;
+                if (schedulerWaiters == null) {
+                    this.schedulerWaiters = schedulerWaiters = new HashSet<>(1);
+                }
+            }
+        }
+
+        SchedulerWaiter waiter = new SchedulerWaiter(scheduler, fiber);
+        synchronized (schedulerWaiters) {
+            schedulerWaiters.add(waiter);
+        }
+        return waiter;
+    }
+
+    public void removeSchedulerWaiter(SchedulerWaiter waiter) {
+        Set<SchedulerWaiter> schedulerWaiters = this.schedulerWaiters;
+
+        synchronized (schedulerWaiters) {
+            schedulerWaiters.remove(waiter);
+        }
+    }
+
+    // MRI: rb_thread_io_close_interrupt, which hands fibers waiting through a scheduler to fiber_interrupt
+    private void interruptSchedulerWaiters(ThreadContext context) {
+        Set<SchedulerWaiter> schedulerWaiters = this.schedulerWaiters;
+
+        if (schedulerWaiters == null) return;
+
+        SchedulerWaiter[] waiters;
+        synchronized (schedulerWaiters) {
+            waiters = schedulerWaiters.toArray(new SchedulerWaiter[0]);
+        }
+
+        for (SchedulerWaiter waiter : waiters) {
+            if (waiter.fiber == context.getFiber()) continue;
+
+            FiberScheduler.fiberInterrupt(context, waiter.scheduler, waiter.fiber, streamClosedInParallelError(runtime));
+        }
+    }
+
     /**
      * Fire an IOError in all threads blocking on this IO object
      */
     public void interruptBlockingThreads(ThreadContext context) {
+        interruptSchedulerWaiters(context);
+
         Set<RubyThread> blockingThreads = this.blockingThreads;
 
         if (blockingThreads == null) {
