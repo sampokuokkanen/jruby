@@ -185,12 +185,18 @@ public class Mutex extends RubyObject implements DataType {
             IRubyObject timeout = awaitingThreads.get() > 0 ?
                     RubyFloat.newFloat(context.runtime, AWAITING_RETRY_SECONDS) : context.nil;
 
+            boolean retry = false;
             try {
                 FiberScheduler.block(context, scheduler, this, timeout);
+                retry = true;
             } finally {
                 synchronized (schedulerWaiters) {
                     schedulerWaiters.remove(waiter);
                 }
+
+                // Interrupted (raise, kill) after unlock may already have polled us as the fiber to wake,
+                // so pass that wakeup on or the waiters behind us would sleep on a free lock.
+                if (!retry) wakeupSchedulerWaiter(context);
             }
         }
     }
