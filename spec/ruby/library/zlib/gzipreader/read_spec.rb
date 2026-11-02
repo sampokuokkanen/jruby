@@ -47,6 +47,48 @@ describe "Zlib::GzipReader#read" do
     gz.read.encoding.should == Encoding::UTF_16LE
   end
 
+  describe "with a buffer argument" do
+    it "reads the contents into the buffer and returns it" do
+      gz = Zlib::GzipReader.new @io
+      buffer = +"old content"
+      gz.read(5, buffer).should.equal?(buffer)
+      buffer.should == @data[0...5]
+      gz.read(5, buffer).should.equal?(buffer)
+      buffer.should == @data[5...10]
+    end
+
+    it "keeps the encoding of the buffer" do
+      gz = Zlib::GzipReader.new @io
+      buffer = String.new(encoding: Encoding::UTF_8)
+      gz.read(5, buffer).encoding.should == Encoding::UTF_8
+    end
+
+    it "clears the buffer and returns it if a 0 length is given" do
+      gz = Zlib::GzipReader.new @io
+      buffer = +"old content"
+      gz.read(0, buffer).should.equal?(buffer)
+      buffer.should == ""
+    end
+
+    it "reads into a new String if the buffer is nil" do
+      gz = Zlib::GzipReader.new @io
+      gz.read(5, nil).should == @data[0...5]
+    end
+
+    it "raises FrozenError if the buffer is frozen" do
+      gz = Zlib::GzipReader.new @io
+      -> { gz.read(5, "frozen".freeze) }.should.raise(FrozenError)
+    end
+
+    it "clears the buffer and returns nil at the end of data" do
+      gz = Zlib::GzipReader.new @io
+      gz.read
+      buffer = +"old content"
+      gz.read(1, buffer).should == nil
+      buffer.should == ""
+    end
+  end
+
   describe "at the end of data" do
     it "returns empty string if length parameter is not specified or 0" do
       gz = Zlib::GzipReader.new @io

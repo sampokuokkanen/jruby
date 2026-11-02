@@ -381,8 +381,11 @@ public class JZlibRubyGzipReader extends RubyGzipFile {
         }
     }
 
+    @CRuby(value = "rb_gzreader_read", file = "ext/zlib/zlib.c")
     @JRubyMethod(name = "read")
     public IRubyObject read(ThreadContext context, IRubyObject arg0, IRubyObject arg1) {
+        if (arg1.isNil()) return read(context, arg0);
+
         try {
             if (arg0.isNil()) return readAll(context);
 
@@ -400,6 +403,7 @@ public class JZlibRubyGzipReader extends RubyGzipFile {
                 return result;
             }
 
+            outbuf.clear(context);
             return outbuf;
         } catch (IOException ioe) {
             return handleIOException(context, ioe);
@@ -427,20 +431,22 @@ public class JZlibRubyGzipReader extends RubyGzipFile {
         }
     }
 
+    @CRuby(value = "gzfile_readpartial", file = "ext/zlib/zlib.c")
     private IRubyObject readPartial(ThreadContext context, int len, RubyString outbuf) throws IOException {
         ByteList val = newReadByteList(10);
         byte[] buffer = new byte[len];
         int read = bufferedStream.read(buffer, 0, len);
 
-        if (read == -1) return context.nil;
+        if (read == -1) {
+            if (outbuf != null) outbuf.clear(context);
+            throw context.runtime.newEOFError();
+        }
 
         val.append(buffer, 0, read);
         this.position += val.length();
 
-        if (outbuf != null) {
-            outbuf.view(val);
-            return outbuf;
-        }
+        // The buffer keeps its encoding, as with IO#readpartial
+        if (outbuf != null) return outbuf.replace(buffer, 0, read, outbuf.getEncoding(), false);
 
         return newStr(context, val);
     }

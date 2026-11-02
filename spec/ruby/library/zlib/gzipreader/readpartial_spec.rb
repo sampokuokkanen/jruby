@@ -14,4 +14,36 @@ describe "Zlib::GzipReader#readpartial" do
     gz = Zlib::GzipReader.new(@io)
     gz.readpartial(5, nil).should == '12345'
   end
+
+  it "reads the contents into the buffer and returns it" do
+    gz = Zlib::GzipReader.new(@io)
+    buffer = +"old content"
+    gz.readpartial(5, buffer).should.equal?(buffer)
+    buffer.should == '12345'
+  end
+
+  it "keeps the encoding of the buffer" do
+    gz = Zlib::GzipReader.new(@io)
+    buffer = String.new(encoding: Encoding::UTF_8)
+    gz.readpartial(5, buffer).encoding.should == Encoding::UTF_8
+  end
+
+  it "raises TypeError if the buffer is not a String" do
+    gz = Zlib::GzipReader.new(@io)
+    -> { gz.readpartial(5, :buffer) }.should.raise(TypeError)
+  end
+
+  it "raises EOFError at the end of data" do
+    gz = Zlib::GzipReader.new(@io)
+    gz.read
+    -> { gz.readpartial(5) }.should.raise(EOFError)
+  end
+
+  it "clears the buffer and raises EOFError at the end of data" do
+    gz = Zlib::GzipReader.new(@io)
+    gz.read
+    buffer = +"old content"
+    -> { gz.readpartial(5, buffer) }.should.raise(EOFError)
+    buffer.should == ""
+  end
 end
