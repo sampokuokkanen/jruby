@@ -1920,6 +1920,22 @@ public abstract class RubyParserBase {
                 new DSymbolNode(line, (DStrNode) value);
     }
     
+    /**
+     * Concatenate adjacent string literals ("a" "b"). A head that is a lone interpolation ("#{a}") keeps the
+     * empty string CRuby starts it with, so it is in the source encoding before the next literal is added, not in
+     * the encoding of the interpolated value.
+     */
+    public Node string_concat(Node head, Node tail) {
+        if (head instanceof DStrNode dstr && dstr.size() == 1 && dstr.get(0) instanceof EvStrNode) {
+            DStrNode prefixed = createDStrNode(dstr.getLine());
+            prefixed.setStringStyle(dstr.getStringStyle());
+            prefixed.add(new StrNode(dstr.getLine(), new ByteList(ByteList.NULL_ARRAY, lexer.getEncoding())));
+            head = prefixed.add(dstr.get(0));
+        }
+
+        return literal_concat(head, tail);
+    }
+
     public Node literal_concat(Node head, Node tail) {
         if (head == null) return tail;
         if (tail == null) return head;

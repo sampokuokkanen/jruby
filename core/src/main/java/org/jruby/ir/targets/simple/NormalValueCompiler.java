@@ -165,17 +165,19 @@ public class NormalValueCompiler implements ValueCompiler {
     public void buildDynamicString(Encoding encoding, int size, boolean frozen, boolean chilled, boolean debugFrozen, String file, int line, List<DStringElement> elements) {
         pushBufferString(encoding, size);
 
-        for (DStringElement elt : elements) {
+        for (int i = 0; i < elements.size(); i++) {
+            DStringElement elt = elements.get(i);
             switch (elt.type()) {
                 case STRING:
                     StringLiteral str = (StringLiteral) elt.value();
                     pushFrozenString(str.getByteList(), str.getCodeRange());
-                    compiler.adapter.invokevirtual(p(RubyString.class), "catWithCodeRange", sig(RubyString.class, RubyString.class));
                     break;
                 case OTHER:
                     ((Runnable) elt.value()).run();
-                    compiler.adapter.invokevirtual(p(RubyString.class), "appendAsDynamicString", sig(RubyString.class, IRubyObject.class));
             }
+            // the result starts in the encoding of its first piece unless that piece is alone
+            String append = i == 0 && elements.size() > 1 ? "appendFirstDStringPiece" : "appendDStringPiece";
+            compiler.adapter.invokevirtual(p(RubyString.class), append, sig(RubyString.class, IRubyObject.class));
         }
         if (frozen) {
             compiler.invokeIRHelper("freezeLiteralString", sig(RubyString.class, RubyString.class));

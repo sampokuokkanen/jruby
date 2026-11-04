@@ -95,17 +95,22 @@ public class BuildCompoundStringInstr extends NOperandResultBaseInstr {
     @Override
     public Object interpret(ThreadContext context, StaticScope currScope, DynamicScope currDynScope, IRubyObject self, Object[] temp) {
         // use estimatedSize * 1.5 to give some initial room for interpolation
-        RubyString str = RubyString.newStringLight(context.runtime, getInitialSize(), encoding);
+        Operand[] pieces = getOperands();
+        // the result starts in the encoding of its first piece, as rb_str_concat_literals does
+        Encoding startEncoding = pieces[0] instanceof StringLiteral first ? first.getByteList().getEncoding() : encoding;
+        RubyString str = RubyString.newStringLight(context.runtime, getInitialSize(), startEncoding);
 
-        for (Operand p : getOperands()) {
-            if (p instanceof StringLiteral) {
-                StringLiteral strLiteral = (StringLiteral) p;
-                ByteList byteList = strLiteral.getByteList();
-                int cr = strLiteral.getCodeRange();
-                str.cat(byteList, cr);
+        for (int i = 0; i < pieces.length; i++) {
+            Operand p = pieces[i];
+            if (p instanceof StringLiteral strLiteral) {
+                str.catDStringPiece(strLiteral.getByteList(), strLiteral.getCodeRange());
             } else {
                 IRubyObject pval = (IRubyObject) p.retrieve(context, self, currScope, currDynScope, temp);
-                str.appendAsDynamicString(pval);
+                if (i == 0 && pieces.length > 1) {
+                    str.appendFirstDStringPiece(pval);
+                } else {
+                    str.appendDStringPiece(pval);
+                }
             }
         }
 
@@ -229,7 +234,7 @@ public class BuildCompoundStringInstr extends NOperandResultBaseInstr {
         if (obj instanceof Appendable app) {
             // Construct a new String vs retrieve since the retrieve would be a frozen string.
             RubyString last = newString(context, lastString.getByteList().dup());
-            app.appendIntoString(last);
+            last.appendDStringPiece(app);
             ByteList newByteList = last.getByteList();
             return asOperand(newByteList);
         }

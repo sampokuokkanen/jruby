@@ -171,6 +171,7 @@ public class BuildDynamicStringSite extends MutableCallSite {
     public static RubyString buildString(ThreadContext context, Appendable a, Encoding encoding, int initialSize) { // 0b0
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
         a.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(a);
 
         return buffer;
     }
@@ -183,16 +184,19 @@ public class BuildDynamicStringSite extends MutableCallSite {
 
     public static RubyString buildString(ThreadContext context, Appendable a, Appendable b, Encoding encoding, int initialSize) { // 0b00
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
         b.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(b);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, ByteListAndCodeRange b, Encoding encoding, int initialSize) { // 0b01
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
-        buffer.catWithCodeRange(b.bl, b.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
 
         return buffer;
     }
@@ -200,49 +204,58 @@ public class BuildDynamicStringSite extends MutableCallSite {
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, Appendable b, Encoding encoding, int initialSize) { // 0b10
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
         b.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(b);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, ByteListAndCodeRange b, Encoding encoding, int initialSize) { // 0b11
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
-        buffer.catWithCodeRange(b.bl, b.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, Appendable b, Appendable c, Encoding encoding, int initialSize) { // 0b000
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
         b.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(b);
         c.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(c);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, Appendable b, ByteListAndCodeRange c, Encoding encoding, int initialSize) { // 0b001
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
         b.appendIntoString(buffer);
-        buffer.catWithCodeRange(c.bl, c.cr);
+        buffer.adoptDStringPieceEncoding(b);
+        buffer.catDStringPiece(c.bl, c.cr);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, ByteListAndCodeRange b, Appendable c, Encoding encoding, int initialSize) { // 0b010
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
-        buffer.catWithCodeRange(b.bl, b.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
         c.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(c);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, ByteListAndCodeRange b, ByteListAndCodeRange c, Encoding encoding, int initialSize) { // 0b011
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
-        buffer.catWithCodeRange(b.bl, b.cr);
-        buffer.catWithCodeRange(c.bl, c.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
+        buffer.catDStringPiece(c.bl, c.cr);
 
         return buffer;
     }
@@ -250,7 +263,9 @@ public class BuildDynamicStringSite extends MutableCallSite {
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, Appendable b, Appendable c, Encoding encoding, int initialSize) { // 0b100
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
         b.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(b);
         c.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(c);
 
         return buffer;
     }
@@ -258,103 +273,125 @@ public class BuildDynamicStringSite extends MutableCallSite {
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, Appendable b, ByteListAndCodeRange c, Encoding encoding, int initialSize) { // 0b101
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
         b.appendIntoString(buffer);
-        buffer.catWithCodeRange(c.bl, c.cr);
+        buffer.adoptDStringPieceEncoding(b);
+        buffer.catDStringPiece(c.bl, c.cr);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, ByteListAndCodeRange b, Appendable c, Encoding encoding, int initialSize) { // 0b110
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
-        buffer.catWithCodeRange(b.bl, b.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
         c.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(c);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, ByteListAndCodeRange b, ByteListAndCodeRange c, Encoding encoding, int initialSize) { // 0b111
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
-        buffer.catWithCodeRange(b.bl, b.cr);
-        buffer.catWithCodeRange(c.bl, c.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
+        buffer.catDStringPiece(c.bl, c.cr);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, Appendable b, Appendable c, Appendable d, Encoding encoding, int initialSize) { // 0b0000
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
         b.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(b);
         c.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(c);
         d.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(d);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, Appendable b, Appendable c, ByteListAndCodeRange d, Encoding encoding, int initialSize) { // 0b0001
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
         b.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(b);
         c.appendIntoString(buffer);
-        buffer.catWithCodeRange(d.bl, d.cr);
+        buffer.adoptDStringPieceEncoding(c);
+        buffer.catDStringPiece(d.bl, d.cr);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, Appendable b, ByteListAndCodeRange c, Appendable d, Encoding encoding, int initialSize) { // 0b0010
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
         b.appendIntoString(buffer);
-        buffer.catWithCodeRange(c.bl, c.cr);
+        buffer.adoptDStringPieceEncoding(b);
+        buffer.catDStringPiece(c.bl, c.cr);
         d.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(d);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, Appendable b, ByteListAndCodeRange c, ByteListAndCodeRange d, Encoding encoding, int initialSize) { // 0b0011
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
         b.appendIntoString(buffer);
-        buffer.catWithCodeRange(c.bl, c.cr);
-        buffer.catWithCodeRange(d.bl, d.cr);
+        buffer.adoptDStringPieceEncoding(b);
+        buffer.catDStringPiece(c.bl, c.cr);
+        buffer.catDStringPiece(d.bl, d.cr);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, ByteListAndCodeRange b, Appendable c, Appendable d, Encoding encoding, int initialSize) { // 0b0100
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
-        buffer.catWithCodeRange(b.bl, b.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
         c.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(c);
         d.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(d);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, ByteListAndCodeRange b, Appendable c, ByteListAndCodeRange d, Encoding encoding, int initialSize) { // 0b0101
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
-        buffer.catWithCodeRange(b.bl, b.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
         c.appendIntoString(buffer);
-        buffer.catWithCodeRange(d.bl, d.cr);
+        buffer.adoptDStringPieceEncoding(c);
+        buffer.catDStringPiece(d.bl, d.cr);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, ByteListAndCodeRange b, ByteListAndCodeRange c, Appendable d, Encoding encoding, int initialSize) { // 0b0110
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
-        buffer.catWithCodeRange(b.bl, b.cr);
-        buffer.catWithCodeRange(c.bl, c.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
+        buffer.catDStringPiece(c.bl, c.cr);
         d.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(d);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, Appendable a, ByteListAndCodeRange b, ByteListAndCodeRange c, ByteListAndCodeRange d, Encoding encoding, int initialSize) { // 0b0111
         RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+        buffer.setEncoding(a.getEncoding());
         a.appendIntoString(buffer);
-        buffer.catWithCodeRange(b.bl, b.cr);
-        buffer.catWithCodeRange(c.bl, c.cr);
-        buffer.catWithCodeRange(d.bl, d.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
+        buffer.catDStringPiece(c.bl, c.cr);
+        buffer.catDStringPiece(d.bl, d.cr);
 
         return buffer;
     }
@@ -362,8 +399,11 @@ public class BuildDynamicStringSite extends MutableCallSite {
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, Appendable b, Appendable c, Appendable d, Encoding encoding, int initialSize) { // 0b1000
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
         b.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(b);
         c.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(c);
         d.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(d);
 
         return buffer;
     }
@@ -371,8 +411,10 @@ public class BuildDynamicStringSite extends MutableCallSite {
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, Appendable b, Appendable c, ByteListAndCodeRange d, Encoding encoding, int initialSize) { // 0b1001
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
         b.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(b);
         c.appendIntoString(buffer);
-        buffer.catWithCodeRange(d.bl, d.cr);
+        buffer.adoptDStringPieceEncoding(c);
+        buffer.catDStringPiece(d.bl, d.cr);
 
         return buffer;
     }
@@ -380,8 +422,10 @@ public class BuildDynamicStringSite extends MutableCallSite {
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, Appendable b, ByteListAndCodeRange c, Appendable d, Encoding encoding, int initialSize) { // 0b1010
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
         b.appendIntoString(buffer);
-        buffer.catWithCodeRange(c.bl, c.cr);
+        buffer.adoptDStringPieceEncoding(b);
+        buffer.catDStringPiece(c.bl, c.cr);
         d.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(d);
 
         return buffer;
     }
@@ -389,44 +433,49 @@ public class BuildDynamicStringSite extends MutableCallSite {
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, Appendable b, ByteListAndCodeRange c, ByteListAndCodeRange d, Encoding encoding, int initialSize) { // 0b1011
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
         b.appendIntoString(buffer);
-        buffer.catWithCodeRange(c.bl, c.cr);
-        buffer.catWithCodeRange(d.bl, d.cr);
+        buffer.adoptDStringPieceEncoding(b);
+        buffer.catDStringPiece(c.bl, c.cr);
+        buffer.catDStringPiece(d.bl, d.cr);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, ByteListAndCodeRange b, Appendable c, Appendable d, Encoding encoding, int initialSize) { // 0b1100
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
-        buffer.catWithCodeRange(b.bl, b.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
         c.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(c);
         d.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(d);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, ByteListAndCodeRange b, Appendable c, ByteListAndCodeRange d, Encoding encoding, int initialSize) { // 0b1101
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
-        buffer.catWithCodeRange(b.bl, b.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
         c.appendIntoString(buffer);
-        buffer.catWithCodeRange(d.bl, d.cr);
+        buffer.adoptDStringPieceEncoding(c);
+        buffer.catDStringPiece(d.bl, d.cr);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, ByteListAndCodeRange b, ByteListAndCodeRange c, Appendable d, Encoding encoding, int initialSize) { // 0b1110
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
-        buffer.catWithCodeRange(b.bl, b.cr);
-        buffer.catWithCodeRange(c.bl, c.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
+        buffer.catDStringPiece(c.bl, c.cr);
         d.appendIntoString(buffer);
+        buffer.adoptDStringPieceEncoding(d);
 
         return buffer;
     }
 
     public static RubyString buildString(ThreadContext context, ByteListAndCodeRange a, ByteListAndCodeRange b, ByteListAndCodeRange c, ByteListAndCodeRange d, Encoding encoding, int initialSize) { // 0b1111
         RubyString buffer = createBufferFromStaticString(context, initialSize, a);
-        buffer.catWithCodeRange(b.bl, b.cr);
-        buffer.catWithCodeRange(c.bl, c.cr);
-        buffer.catWithCodeRange(d.bl, d.cr);
+        buffer.catDStringPiece(b.bl, b.cr);
+        buffer.catDStringPiece(c.bl, c.cr);
+        buffer.catDStringPiece(d.bl, d.cr);
 
         return buffer;
     }
@@ -454,20 +503,21 @@ public class BuildDynamicStringSite extends MutableCallSite {
     public RubyString buildString2(ThreadContext context, Appendable a, Appendable b, Appendable c, Appendable d, Appendable e, Encoding encoding, int initialSize) {
         long descriptor = this.descriptor;
         ByteListAndCodeRange[] strings = this.strings;
-        int i;
+        int i = 1;
+        int dynamicArg = 0;
         RubyString buffer;
 
         if (isDynamicElement(descriptor, 0)) {
-            // first element is dynamic, create empty buffer and start at index 0 below
+            // first element is dynamic, append it to an empty buffer in its encoding and start at index 1 below
             buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
-            i = 0;
+            buffer.setEncoding(a.getEncoding());
+            a.appendIntoString(buffer);
+            dynamicArg = 1;
         } else {
             // first element is string, use it to create buffer and start at index 1 below
             buffer = createBufferFromStaticString(context, initialSize, strings[0]);
-            i = 1;
         }
 
-        int dynamicArg = 0;
         int elementCount = this.elementCount;
 
         for (; i < elementCount; i++) {
@@ -483,9 +533,10 @@ public class BuildDynamicStringSite extends MutableCallSite {
                 };
 
                 dynamicElement.appendIntoString(buffer);
+                buffer.adoptDStringPieceEncoding(dynamicElement);
             } else {
                 ByteListAndCodeRange string = strings[i];
-                buffer.catWithCodeRange(string.bl, string.cr);
+                buffer.catDStringPiece(string.bl, string.cr);
             }
         }
 
@@ -526,14 +577,21 @@ public class BuildDynamicStringSite extends MutableCallSite {
     }
 
     public RubyString buildStringFromMany(ThreadContext context, Appendable... values) {
-        RubyString buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
-
+        RubyString buffer;
         int valueIdx = 0;
-        for (int i = 0; i < elementCount; i++) {
+
+        if (isStringElement(descriptor, 0)) {
+            buffer = createBufferFromStaticString(context, initialSize, strings[0]);
+        } else {
+            buffer = StringBootstrap.bufferString(context, encoding, initialSize, StringSupport.CR_7BIT);
+            buffer.appendFirstDStringPiece(values[valueIdx++]);
+        }
+
+        for (int i = 1; i < elementCount; i++) {
             if (isStringElement(descriptor, i)) {
-                buffer.catWithCodeRange(strings[i].bl, strings[i].cr);
+                buffer.catDStringPiece(strings[i].bl, strings[i].cr);
             } else {
-                values[valueIdx++].appendIntoString(buffer);
+                buffer.appendDStringPiece(values[valueIdx++]);
             }
         }
 

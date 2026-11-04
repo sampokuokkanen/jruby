@@ -5781,7 +5781,7 @@ states[633] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, 
 };
 states[634] = (RubyParser p, Object yyVal, ProductionState[] yyVals, int yyTop, int count, int yychar) -> {
                     /*%%%*/
-                    yyVal = p.literal_concat(((Node)yyVals[-1+yyTop].value), ((Node)yyVals[0+yyTop].value));
+                    yyVal = p.string_concat(((Node)yyVals[-1+yyTop].value), ((Node)yyVals[0+yyTop].value));
                     /*% %*/
                     /*% ripper: string_concat!($1, $2) %*/
   return yyVal;

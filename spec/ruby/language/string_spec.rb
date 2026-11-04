@@ -293,6 +293,32 @@ describe "Ruby String interpolation" do
     "#{b}".encoding.should == Encoding::BINARY
   end
 
+  it "returns a string with the source encoding for a lone interpolation followed by an adjacent literal" do
+    a = "abc".dup.force_encoding("euc-jp")
+    ("#{a}" "x").encoding.should == Encoding::BINARY
+    ("#{a}" "#{a}").encoding.should == Encoding::BINARY
+  end
+
+  ruby_version_is "3.4" do
+    it "returns a string with the encoding of the first component when it is interpolated and followed by others" do
+      a = "abc".dup.force_encoding("euc-jp")
+      "#{a}x".encoding.should == Encoding::EUC_JP
+      "#{a}#{a}".encoding.should == Encoding::EUC_JP
+
+      b = "abc".encode("utf-8")
+      "#{b}x".encoding.should == Encoding::UTF_8
+      "#{b}#{a}".encoding.should == Encoding::UTF_8
+    end
+
+    it "takes the encoding of the next non-US-ASCII component when the first component is US-ASCII" do
+      a = "abc".dup.force_encoding("euc-jp")
+      "#{1}#{a}".encoding.should == Encoding::EUC_JP
+      "#{1}#{a}x".encoding.should == Encoding::EUC_JP
+      "#{1}x".encoding.should == Encoding::BINARY
+      "#{1}#{2}".encoding.should == Encoding::US_ASCII
+    end
+  end
+
   it "raises an Encoding::CompatibilityError if the Encodings are not compatible" do
     a = "\u3042"
     b = "\xff".dup.force_encoding "binary"

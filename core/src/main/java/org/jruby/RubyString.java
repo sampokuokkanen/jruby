@@ -2934,6 +2934,56 @@ public class RubyString extends RubyObject implements CharSequence, EncodingCapa
         return append(other, (o) -> o.asString());
     }
 
+    /**
+     * Append the first of several pieces of an interpolated string to this empty buffer. The result starts in the
+     * encoding of that piece, as CRuby copies it from strary[0]. A lone interpolation is appended to an empty
+     * string in the source encoding instead, with {@link #appendDStringPiece(Appendable)}.
+     */
+    @CRuby(value = "rb_str_concat_literals", file = "string.c")
+    public RubyString appendFirstDStringPiece(IRubyObject other) {
+        return appendFirstDStringPiece(other instanceof Appendable appendable ? appendable : other.asString());
+    }
+
+    @CRuby(value = "rb_str_concat_literals", file = "string.c")
+    public RubyString appendFirstDStringPiece(Appendable piece) {
+        value.setEncoding(piece.getEncoding());
+        piece.appendIntoString(this);
+        return this;
+    }
+
+    /**
+     * Append a later piece of an interpolated string. A US-ASCII result takes the encoding of the next piece that
+     * is not US-ASCII.
+     */
+    @CRuby(value = "rb_str_concat_literals", file = "string.c")
+    public RubyString appendDStringPiece(IRubyObject other) {
+        return appendDStringPiece(other instanceof Appendable appendable ? appendable : other.asString());
+    }
+
+    @CRuby(value = "rb_str_concat_literals", file = "string.c")
+    public RubyString appendDStringPiece(Appendable piece) {
+        piece.appendIntoString(this);
+        return adoptDStringPieceEncoding(piece);
+    }
+
+    @CRuby(value = "rb_str_concat_literals", file = "string.c")
+    public RubyString catDStringPiece(ByteList piece, int cr) {
+        catWithCodeRange(piece, cr);
+        if (value.getEncoding() == USASCIIEncoding.INSTANCE) value.setEncoding(piece.getEncoding());
+        return this;
+    }
+
+    /**
+     * Call after appending a later piece of an interpolated string with {@link Appendable#appendIntoString}, so a
+     * US-ASCII result takes the encoding of that piece. JIT-built strings append at their own call sites to keep
+     * each type profile separate.
+     */
+    @CRuby(value = "rb_str_concat_literals", file = "string.c")
+    public RubyString adoptDStringPieceEncoding(Appendable piece) {
+        if (value.getEncoding() == USASCIIEncoding.INSTANCE) value.setEncoding(piece.getEncoding());
+        return this;
+    }
+
     public RubyString appendAsStringOrAny(IRubyObject other) {
         return append(other, (o) -> (RubyString) o.anyToString());
     }

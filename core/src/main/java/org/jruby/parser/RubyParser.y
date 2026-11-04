@@ -3874,7 +3874,7 @@ string          : tCHAR {
                 }
                 | string string1 {
                     /*%%%*/
-                    $$ = p.literal_concat($1, $2);
+                    $$ = p.string_concat($1, $2);
                     /*% %*/
                     /*% ripper: string_concat!($1, $2) %*/
                 };
