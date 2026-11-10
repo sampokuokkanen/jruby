@@ -29,6 +29,30 @@ platform_is_not :mingw do
       ScratchPad.recorded.should == nil
     end
 
+    it "kills current thread when called in a Fiber" do
+      ScratchPad.record []
+      thread = Thread.new do
+        Fiber.new { Thread.current.kill; ScratchPad << :fiber }.resume
+        ScratchPad << :thread
+      end
+      thread.join
+      ScratchPad.recorded.should == []
+    end
+
+    it "kills current thread when called in a Fiber inside Thread.handle_interrupt(Object => :never)" do
+      ScratchPad.record []
+      thread = Thread.new do
+        Thread.handle_interrupt(Object => :never) do
+          Fiber.new { Thread.current.kill; ScratchPad << :fiber }.resume
+          ScratchPad << :thread
+        end
+      ensure
+        ScratchPad << :ensure
+      end
+      thread.join(5).should == thread
+      ScratchPad.recorded.should == [:ensure]
+    end
+
     it "runs ensure clause" do
       thread = ThreadSpecs.dying_thread_ensures(:kill) { ScratchPad.record :in_ensure_clause }
       thread.join
@@ -113,6 +137,23 @@ platform_is_not :mingw do
       t.kill
       t.join
       ScratchPad.recorded.should == nil
+    end
+
+    it "runs the ensure clauses of the active fiber" do
+      ready = Queue.new
+      t = Thread.new do
+        Fiber.new do
+          ready << true
+          sleep
+        ensure
+          ScratchPad.record :fiber_ensure
+        end.resume
+      end
+      ready.pop
+      Thread.pass until t.stop?
+      t.kill
+      t.join
+      ScratchPad.recorded.should == :fiber_ensure
     end
 
     it "kills other fibers of that thread without running their ensure clauses" do

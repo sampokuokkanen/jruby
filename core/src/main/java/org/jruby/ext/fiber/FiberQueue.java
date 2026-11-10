@@ -54,7 +54,10 @@ public class FiberQueue {
     private static final RubyThread.Task<FiberQueue, FiberRequest> TAKE_TASK = new RubyThread.Task<FiberQueue, FiberRequest>() {
         @Override
         public FiberRequest run(ThreadContext context, FiberQueue queue) throws InterruptedException {
-            return queue.getQueueSafe().take();
+            BlockingQueue<FiberRequest> q = queue.queue;
+            // shut down: let pop take the kill sent with the shutdown
+            if (q == null) throw new InterruptedException();
+            return q.take();
         }
 
         @Override
@@ -88,26 +91,26 @@ public class FiberQueue {
         }
     }
 
-    // MRI's fiber_switch never waits, so loop like its sleep_forever: deliverable interrupts raise out of
-    // executeTaskBlocking, and one deferred by Thread.handle_interrupt stays pending while we wait again
-    @CRuby(value = "sleep_forever", file = "thread.c")
+    // MRI's fiber_switch does not check interrupts while waiting for control; the fiber running now takes them,
+    // and this one checks once it has control. A finalized fiber is shut down and takes the kill sent to it.
+    @CRuby(value = "fiber_switch", file = "cont.c")
     public FiberRequest pop(ThreadContext context) {
         while (true) {
             try {
-                return context.getThread().executeTaskBlocking(context, this, TAKE_TASK);
+                return context.getThread().executeTaskUnchecked(context, this, TAKE_TASK);
             } catch (InterruptedException ie) {
-                // nothing deliverable, keep waiting
+                if (isShutdown()) {
+                    context.pollThreadEvents();
+                    checkShutdown();
+                }
             }
         }
     }
 
+    // A fiber switch is not interruptible. The fiber we hand to is waiting in pop, so its queue has room, and
+    // offer does not throw on a pending Java interrupt, unlike put.
     public void push(ThreadContext context, final FiberRequest arg) {
-        checkShutdown();
-        try {
-            queue.put(arg);
-        } catch (InterruptedException ie) {
-            throw context.runtime.newThreadError("interrupted in FiberQueue.push");
-        }
+        if (!getQueueSafe().offer(arg)) throw context.runtime.newThreadError("fiber queue full");
     }
 
 }

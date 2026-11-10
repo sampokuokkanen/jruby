@@ -17,10 +17,10 @@ import org.jruby.ast.util.ArgsUtil;
 import org.jruby.exceptions.FiberKill;
 import org.jruby.exceptions.JumpException;
 import org.jruby.exceptions.RaiseException;
+import org.jruby.exceptions.ThreadKill;
 import org.jruby.ir.operands.IRException;
 import org.jruby.ir.runtime.IRBreakJump;
 import org.jruby.ir.runtime.IRReturnJump;
-import org.jruby.javasupport.JavaUtil;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.ExecutionContext;
 import org.jruby.runtime.Helpers;
@@ -221,7 +221,7 @@ public class ThreadFiber extends RubyObject implements ExecutionContext {
             return exception.toThrowable();
         }
 
-        return (RuntimeException) request.data;
+        return Helpers.throwExceptionT((Throwable) request.data);
     }
 
     private static void fiberCalledAcrossThreads(Ruby runtime) {
@@ -258,11 +258,8 @@ public class ThreadFiber extends RubyObject implements ExecutionContext {
         // push should not block and does not check interrupts
         targetFiberData.queue.push(context, request);
 
-        // At this point we consider ourselves "in" the resume, so we need to make an effort to propagate any interrupt
-        // raise to the fiber. We forward the exception using the interrupt mechanism and then try once more to let the
-        // fiber deal with the exception and either re-raise it or handle it and give us a non-exceptional result. If
-        // the second pop is interrupted, either the fiber has propagated the exception back to us or we are being
-        // interrupted again and must abandon the fiber.
+        // While we wait, the fiber we switched to takes Thread#raise and Thread#kill; pop does not check for them.
+        // An exception out of pop (our queue shut down) is still handed to the fiber if it can take it.
 
         FiberRequest result;
         try {
@@ -275,12 +272,15 @@ public class ThreadFiber extends RubyObject implements ExecutionContext {
         } finally {
             // MRI: fiber_switch re-reads the current fiber; control can return into a different one
             if (currentFiberData.blocking) context.getFiberCurrentThread().incrementBlocking();
-
-            // MRI: fiber_restore_thread, th->ec now belongs to us again
-            context.getFiberCurrentThread().setRunningFiberThread(context.getThread());
-
-            context.trace(RubyEvent.FIBER_SWITCH, "resume", context.runtime.getFiber());
         }
+
+        // MRI: fiber_restore_thread, th->ec now belongs to us again
+        context.getFiberCurrentThread().setRunningFiberThread(context.getThread());
+
+        // MRI: fiber_switch, RUBY_VM_CHECK_INTS once we are running again, before the switch event
+        context.pollThreadEvents();
+
+        context.trace(RubyEvent.FIBER_SWITCH, "resume", context.runtime.getFiber());
 
         // MRI: fiber_check_killed, for a kill that arrived while we were switched away
         if (checkKilled && currentFiberData.killed) throw new FiberKill();
@@ -589,13 +589,10 @@ public class ThreadFiber extends RubyObject implements ExecutionContext {
         }
     }
 
-    // forward a control-flow exception to whoever regains control, if it is still around
-    private static void raiseInReturnFiber(FiberData data, IRubyObject exception) {
-        ThreadFiber target = returnFiber(data);
-        if (target == null) return;
-
-        RubyThread thread = target.thread;
-        if (thread != null) thread.raise(exception);
+    // raise a RubyException or Java Throwable in whoever regains control, if it is still around. It goes through
+    // the queue, as the waiting fiber does not check interrupts
+    private static void raiseInReturnFiber(ThreadContext context, FiberData data, Object exception) {
+        pushToReturnFiber(context, data, new FiberRequest(exception, RequestType.RAISE));
     }
 
     // hand a result back to whoever regains control, if it is still around
@@ -680,20 +677,32 @@ public class ThreadFiber extends RubyObject implements ExecutionContext {
                     } catch (FiberKill fk) {
                         // push a final result and quietly die
                         pushToReturnFiber(ctxt, data, new FiberRequest(ctxt.nil, RequestType.DATA));
+                    } catch (ThreadKill tk) {
+                        ThreadFiber tf = data.fiber.get();
+                        if (tf == null || tf.data == null) {
+                            // Finalized: nobody waits for this fiber. Check this first: when the thread is dying too,
+                            // passing the kill on would wake a fiber that transferred away while another one runs.
+                        } else if (data.parent.isKilled()) {
+                            // MRI: rb_fiber_start hands a Thread#kill on to the next fiber, so the whole thread dies.
+                            pushToReturnFiber(ctxt, data, new FiberRequest(tk, RequestType.RAISE));
+                        } else {
+                            // Only this fiber's own thread was killed: end like Fiber#kill
+                            pushToReturnFiber(ctxt, data, new FiberRequest(ctxt.nil, RequestType.DATA));
+                        }
                     } catch (JumpException.FlowControlException fce) {
-                        raiseInReturnFiber(data, fce.buildException(context.runtime).getException());
+                        raiseInReturnFiber(ctxt, data, fce.buildException(context.runtime).getException());
                     } catch (IRBreakJump bj) {
                         // This is one of the rare cases where IR flow-control jumps
                         // leaks into the runtime impl.
-                        raiseInReturnFiber(data, ((RaiseException) IRException.BREAK_LocalJumpError.getException(context.runtime)).getException());
+                        raiseInReturnFiber(ctxt, data, ((RaiseException) IRException.BREAK_LocalJumpError.getException(context.runtime)).getException());
                     } catch (IRReturnJump rj) {
                         // This is one of the rare cases where IR flow-control jumps
                         // leaks into the runtime impl.
-                        raiseInReturnFiber(data, ((RaiseException) IRException.RETURN_LocalJumpError.getException(context.runtime)).getException());
+                        raiseInReturnFiber(ctxt, data, ((RaiseException) IRException.RETURN_LocalJumpError.getException(context.runtime)).getException());
                     } catch (RaiseException re) {
                         pushToReturnFiber(ctxt, data, new FiberRequest(re.getException().toThrowable(), RequestType.RAISE));
                     } catch (Throwable t) {
-                        raiseInReturnFiber(data, JavaUtil.convertJavaToUsableRubyObject(context.runtime, t));
+                        raiseInReturnFiber(ctxt, data, t);
                     } finally {
                         thread.setName(oldName);
                     }

@@ -17,4 +17,15 @@ describe "Thread.exit" do
     thread.join
     thread.status.should == false
   end
+
+  it "exits the current thread when called in a Fiber" do
+    log = []
+    thread = Thread.new do
+      Fiber.new { Thread.exit; log << :fiber }.resume
+      log << :thread
+    end
+    thread.join
+    thread.status.should == false
+    log.should == []
+  end
 end
