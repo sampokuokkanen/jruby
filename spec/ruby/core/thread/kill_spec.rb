@@ -115,6 +115,23 @@ platform_is_not :mingw do
       ScratchPad.recorded.should == nil
     end
 
+    it "runs the ensure clauses of the active fiber" do
+      ready = Queue.new
+      t = Thread.new do
+        Fiber.new do
+          ready << true
+          sleep
+        ensure
+          ScratchPad.record :fiber_ensure
+        end.resume
+      end
+      ready.pop
+      Thread.pass until t.stop?
+      t.kill
+      t.join
+      ScratchPad.recorded.should == :fiber_ensure
+    end
+
     it "kills other fibers of that thread without running their ensure clauses" do
       t = Thread.new do
         f = Fiber.new do

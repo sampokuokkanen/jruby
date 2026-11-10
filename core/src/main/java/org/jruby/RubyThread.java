@@ -763,7 +763,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
             runtime.getThreadService().associateThread(thread, this);
 
             // copy parent thread's interrupt masks
-            copyInterrupts(context, context.getThread().interruptMaskStack, this.interruptMaskStack);
+            copyInterrupts(context, context.getFiberCurrentThread().interruptMaskStack, this.interruptMaskStack);
 
             // start the native thread
             thread.start();
@@ -884,17 +884,32 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         if (anyInterrupted()) {
             executeInterrupts(context, false);
         }
+
+        RubyThread owner = fiberOwner();
+        if (owner != null) owner.pollThreadEvents(context);
     }
 
     @CRuby(value = "RUBY_VM_CHECK_INTS_BLOCKING", file = "thread.c")
     public void blockingThreadPoll(ThreadContext context) {
-        if (pendingInterruptQueue.isEmpty() && !anyInterrupted()) {
-            return;
+        if (!pendingInterruptQueue.isEmpty() || anyInterrupted()) {
+            pendingInterruptQueueChecked = false;
+            setInterrupt();
+            executeInterrupts(context, true);
         }
 
-        pendingInterruptQueueChecked = false;
-        setInterrupt();
-        executeInterrupts(context, true);
+        RubyThread owner = fiberOwner();
+        if (owner != null) owner.blockingThreadPoll(context);
+    }
+
+    /**
+     * A fiber runs on a RubyThread of its own, but Thread#raise and Thread#kill queue on the thread owning it,
+     * and only the running fiber takes them. MRI: interrupts are checked on th->ec, the running fiber.
+     *
+     * @return the owning thread when this one backs a fiber, otherwise null
+     */
+    private RubyThread fiberOwner() {
+        RubyThread owner = fiberCurrentThread;
+        return owner == this ? null : owner;
     }
 
     @CRuby(value = "RUBY_VM_INTERRUPTED_ANY", file = "vm_core.h")
@@ -918,7 +933,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         mask.visitAll(context, HandleInterruptVisitor, null);
         mask.setFrozen(true);
 
-        return context.getThread().handleInterrupt(context, mask, block);
+        return context.getFiberCurrentThread().handleInterrupt(context, mask, block);
     }
 
     private IRubyObject handleInterrupt(ThreadContext context, RubyHash mask, BiFunction<ThreadContext, IRubyObject, IRubyObject> block) {
@@ -975,12 +990,12 @@ public class RubyThread extends RubyObject implements ExecutionContext {
 
     @JRubyMethod(name = "pending_interrupt?", meta = true)
     public static IRubyObject pending_interrupt_p_s(ThreadContext context, IRubyObject self) {
-        return context.getThread().pending_interrupt_p(context);
+        return context.getFiberCurrentThread().pending_interrupt_p(context);
     }
 
     @JRubyMethod(name = "pending_interrupt?", meta = true)
     public static IRubyObject pending_interrupt_p_s(ThreadContext context, IRubyObject self, IRubyObject err) {
-        return context.getThread().pending_interrupt_p(context, err);
+        return context.getFiberCurrentThread().pending_interrupt_p(context, err);
     }
 
     @JRubyMethod(name = "pending_interrupt?")
@@ -1509,7 +1524,8 @@ public class RubyThread extends RubyObject implements ExecutionContext {
 
     @JRubyMethod(meta = true)
     public static IRubyObject exit(IRubyObject receiver, Block block) {
-        RubyThread rubyThread = receiver.getRuntime().getThreadService().getCurrentContext().getThread();
+        // from a fiber, too, this ends the whole thread
+        RubyThread rubyThread = receiver.getRuntime().getThreadService().getCurrentContext().getFiberCurrentThread();
 
         return rubyThread.kill();
     }
@@ -1640,7 +1656,8 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         pendingInterruptEnqueue(prepareRaiseException(context, args));
         interrupt();
 
-        if (currentThread == this) {
+        // raising in our own thread, also from one of its fibers, takes effect right away
+        if (currentThread.getFiberCurrentThread() == this) {
             executeInterrupts(context, false);
         }
 
@@ -2022,6 +2039,33 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         }
     }
 
+    /**
+     * Run a task that can be woken by {@link #interrupt()} but does not check for interrupts itself.
+     * Waiting for another fiber is not a place to take interrupts: the fiber running now takes them.
+     * MRI: fiber_switch
+     *
+     * @param context the current context
+     * @param data the data object for the task
+     * @param task the task to run
+     * @return the task's result
+     * @throws InterruptedException if woken
+     */
+    public <Data, Return> Return executeTaskUnchecked(ThreadContext context, Data data, Task<Data, Return> task) throws InterruptedException {
+        Status oldStatus = STATUS.get(this);
+        try {
+            this.unblockArg = data;
+            this.unblockFunc = task;
+
+            STATUS.set(this, Status.SLEEP);
+
+            return task.run(context, data);
+        } finally {
+            STATUS.set(this, oldStatus);
+            this.unblockFunc = null;
+            this.unblockArg = null;
+        }
+    }
+
     public <Data, Return> Return executeTaskBlocking(ThreadContext context, Data data, Task<Data, Return> task) throws InterruptedException {
         return executeTask(context, data, Status.SLEEP, task, true);
     }
@@ -2169,6 +2213,13 @@ public class RubyThread extends RubyObject implements ExecutionContext {
         STATUS.set(this, Status.SLEEP);
     }
 
+    /**
+     * @return whether Thread#kill has been delivered to this thread
+     */
+    public boolean isKilled() {
+        return killed;
+    }
+
     public void exitSleep() {
         STATUS.set(this, Status.RUN);
     }
@@ -2215,8 +2266,8 @@ public class RubyThread extends RubyObject implements ExecutionContext {
     }
 
     private IRubyObject genericKill(Ruby runtime, RubyThread currentThread) {
-        // If the killee thread is the same as the killer thread, just die
-        if (currentThread == this) throwThreadKill();
+        // If the killee thread is the same as the killer thread, just die, also when killed from one of its fibers
+        if (currentThread != null && currentThread.getFiberCurrentThread() == this) throwThreadKill();
 
         pendingInterruptEnqueue(RubyFixnum.zero(runtime));
         interrupt();
@@ -2612,6 +2663,10 @@ public class RubyThread extends RubyObject implements ExecutionContext {
     public synchronized void interrupt() {
         setInterrupt();
 
+        // MRI: rb_threadptr_interrupt flags th->ec and runs its unblock function, both of the fiber running now
+        RubyThread running = running();
+        if (running != this) running.interrupt();
+
         synchronized (currentSelectorLock) {
             Selector activeSelector = currentSelector;
             if (activeSelector != null) {
@@ -2872,7 +2927,7 @@ public class RubyThread extends RubyObject implements ExecutionContext {
      */
     @CRuby(value = "rb_uninterruptible", file = "thread.c")
     public static <StateType> IRubyObject uninterruptible(ThreadContext context, StateType state, BiFunction<ThreadContext, StateType, IRubyObject> f) {
-        return context.getThread().handleInterrupt(
+        return context.getFiberCurrentThread().handleInterrupt(
                 context,
                 RubyHash.newHash(context.runtime, objectClass(context), asSymbol(context, "never")),
                 state,
@@ -2939,7 +2994,11 @@ public class RubyThread extends RubyObject implements ExecutionContext {
 
     @Deprecated(since = "9.4.6.0")
     public static IRubyObject pending_interrupt_p(ThreadContext context, IRubyObject self, IRubyObject[] args) {
-        return context.getThread().pending_interrupt_p(context, args);
+        return switch (args.length) {
+            case 0 -> pending_interrupt_p_s(context, self);
+            case 1 -> pending_interrupt_p_s(context, self, args[0]);
+            default -> throw argumentError(context, args.length, 0, 1);
+        };
     }
 
     @Deprecated(since = "9.4.6.0")

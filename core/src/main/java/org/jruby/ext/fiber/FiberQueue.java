@@ -88,25 +88,38 @@ public class FiberQueue {
         }
     }
 
-    // MRI's fiber_switch never waits, so loop like its sleep_forever: deliverable interrupts raise out of
-    // executeTaskBlocking, and one deferred by Thread.handle_interrupt stays pending while we wait again
-    @CRuby(value = "sleep_forever", file = "thread.c")
+    // MRI's fiber_switch never waits or checks interrupts there; the fiber running now takes them, and the one
+    // getting control checks once it has it. A finalized fiber is shut down and takes the kill sent to it.
+    @CRuby(value = "fiber_switch", file = "cont.c")
     public FiberRequest pop(ThreadContext context) {
         while (true) {
             try {
-                return context.getThread().executeTaskBlocking(context, this, TAKE_TASK);
+                return context.getThread().executeTaskUnchecked(context, this, TAKE_TASK);
             } catch (InterruptedException ie) {
-                // nothing deliverable, keep waiting
+                if (isShutdown()) {
+                    context.pollThreadEvents();
+                    checkShutdown();
+                }
             }
         }
     }
 
+    // A fiber switch is not interruptible. A Thread#raise deferred by Thread.handle_interrupt can still leave
+    // the Java interrupt flag set after we stopped waiting, so keep putting and restore the flag for the next poll.
     public void push(ThreadContext context, final FiberRequest arg) {
         checkShutdown();
+        boolean interrupted = false;
         try {
-            queue.put(arg);
-        } catch (InterruptedException ie) {
-            throw context.runtime.newThreadError("interrupted in FiberQueue.push");
+            while (true) {
+                try {
+                    queue.put(arg);
+                    return;
+                } catch (InterruptedException ie) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
         }
     }
 

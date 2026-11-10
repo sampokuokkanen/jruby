@@ -124,6 +124,108 @@ describe "Thread.handle_interrupt" do
     log.should == [:done, :after_resume]
   end
 
+  it "keeps the mask of a suspended Fiber in effect for the rest of the thread" do
+    ready = Queue.new
+    go = Queue.new
+    log = []
+    thread = Thread.new do
+      fiber = Fiber.new do
+        Thread.handle_interrupt(RuntimeError => :never) do
+          Fiber.yield
+          log << :after_yield
+        end
+        log << :not_reached
+      end
+      fiber.resume
+      ready << true
+      go.pop
+      log << :root_continued
+      fiber.resume
+    end
+    thread.report_on_exception = false
+
+    ready.pop
+    thread.raise "interrupt while fiber suspended"
+    Thread.pass until thread.pending_interrupt? || !thread.alive?
+    go << true
+
+    -> { thread.join }.should.raise(RuntimeError, "interrupt while fiber suspended")
+    log.should == [:root_continued, :after_yield]
+  end
+
+  it "reports an interrupt deferred inside a Fiber as pending" do
+    ready = Queue.new
+    go = Queue.new
+    log = []
+    thread = Thread.new do
+      Fiber.new do
+        Thread.handle_interrupt(RuntimeError => :never) do
+          ready << true
+          go.pop
+          log << Thread.pending_interrupt?
+        end
+      end.resume
+    end
+    thread.report_on_exception = false
+
+    ready.pop
+    thread.raise "interrupt deferred in fiber"
+    Thread.pass until thread.pending_interrupt? || !thread.alive?
+    go << true
+
+    -> { thread.join }.should.raise(RuntimeError, "interrupt deferred in fiber")
+    log.should == [true]
+  end
+
+  it "with :on_blocking in a running Fiber defers interrupts until the Fiber blocks" do
+    ready = Queue.new
+    log = []
+    thread = Thread.new do
+      Fiber.new do
+        Thread.handle_interrupt(RuntimeError => :on_blocking) do
+          ready << true
+          begin
+            nil until Thread.pending_interrupt?
+            i = 0
+            i += 1 while i < 100_000
+            log << :before_blocking
+            sleep
+          rescue RuntimeError => e
+            log << e.message
+          end
+        end
+      end.resume
+    end
+
+    ready.pop
+    thread.raise "interrupt on blocking"
+    thread.join
+    log.should == [:before_blocking, "interrupt on blocking"]
+  end
+
+  it "is inherited by a Thread created inside a Fiber" do
+    ready = Queue.new
+    go = Queue.new
+    child = nil
+    Fiber.new do
+      Thread.handle_interrupt(RuntimeError => :never) do
+        child = Thread.new do
+          ready << true
+          go.pop
+          Thread.pending_interrupt?
+        end
+      end
+    end.resume
+    child.report_on_exception = false
+
+    ready.pop
+    child.raise "interrupt in child"
+    Thread.pass until child.pending_interrupt? || !child.alive?
+    go << true
+
+    child.value.should == true
+  end
+
   it "runs pending interrupts at the end of the block, even if there was an exception raised in the block" do
     executed = false
     -> {
