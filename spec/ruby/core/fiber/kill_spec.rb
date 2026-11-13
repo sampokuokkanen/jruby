@@ -47,7 +47,7 @@ describe "Fiber#kill" do
     parent.alive?.should == false
   end
 
-  it "raises in the child and kills the parent once the child returns, when the child kills it" do
+  it "raises RuntimeError in a child that kills its resuming parent, and the parent dies when the child returns" do
     ScratchPad.record []
     parent = Fiber.new do
       child = Fiber.new do
@@ -82,6 +82,21 @@ describe "Fiber#kill" do
     fiber.resume
     fiber.kill
     ensure_executed.should == true
+  end
+
+  it "finishes the ensure block when the ensure kills a non-resumed fiber" do
+    ScratchPad.record []
+
+    fiber = Fiber.new do
+      while true; Fiber.yield; end
+    ensure
+      Fiber.new {}.kill
+      ScratchPad << :after_kill
+    end
+
+    fiber.resume
+    fiber.kill
+    ScratchPad.recorded.should == [:after_kill]
   end
 
   it "does not execute rescue block" do
