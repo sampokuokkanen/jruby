@@ -79,6 +79,21 @@ public class ByteListEqualBench {
         return arrays(buf, begin, otherBuf, otherBegin, size);
     }
 
+    // reviewer's suggestion on #10078: the PR code, but from 256 bytes Arrays.equals checks the middle
+    static boolean hybrid256(byte[] buf, int begin, byte[] otherBuf, int otherBegin, int size) {
+        if (size < Long.BYTES) return bytes(buf, begin, otherBuf, otherBegin, size);
+        int tail = size - Long.BYTES;
+        if ((long) LONGS.get(buf, begin + tail) != (long) LONGS.get(otherBuf, otherBegin + tail)) return false;
+        if ((long) LONGS.get(buf, begin) != (long) LONGS.get(otherBuf, otherBegin)) return false;
+        if (size >= 256) {
+            return Arrays.equals(buf, begin + Long.BYTES, begin + tail, otherBuf, otherBegin + Long.BYTES, otherBegin + tail);
+        }
+        for (int i = Long.BYTES; i < tail; i += Long.BYTES) {
+            if ((long) LONGS.get(buf, begin + i) != (long) LONGS.get(otherBuf, otherBegin + i)) return false;
+        }
+        return true;
+    }
+
     static final Map<String, Impl> IMPLS = new LinkedHashMap<>();
     static {
         IMPLS.put("bytes", ByteListEqualBench::bytes);
@@ -87,9 +102,10 @@ public class ByteListEqualBench {
         IMPLS.put("hybrid", ByteListEqualBench::hybrid);
         IMPLS.put("hybridEnds", ByteListEqualBench::hybridEnds);
         IMPLS.put("hybridLongs", ByteListEqualBench::hybridLongs);
+        IMPLS.put("hybrid256", ByteListEqualBench::hybrid256);
     }
 
-    static final int[] SIZES = {3, 7, 8, 12, 16, 24, 32, 48, 64, 100, 256, 1024, 8192};
+    static final int[] SIZES = {3, 7, 8, 12, 16, 24, 32, 48, 64, 100, 255, 256, 512, 1024, 8192, 65536};
     static final String[] CASES = {"equal", "diffFirst", "diffMid", "diffLast"};
 
     static volatile int sink;
@@ -126,7 +142,7 @@ public class ByteListEqualBench {
         int checks = 0;
         for (Map.Entry<String, Impl> e : IMPLS.entrySet()) {
             Impl impl = e.getValue();
-            for (int size = 0; size <= 80; size++) {
+            for (int size = 0; size <= 300; size += size < 80 ? 1 : 7) {
                 for (int aBegin = 0; aBegin < 9; aBegin++) {
                     for (int bBegin = 0; bBegin < 9; bBegin++) {
                         byte[] a = new byte[aBegin + size + 9];
