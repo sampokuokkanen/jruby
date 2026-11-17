@@ -34,10 +34,7 @@ package org.jruby.util;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.VarHandle;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -59,9 +56,6 @@ import org.jruby.runtime.Helpers;
 @SuppressWarnings("ComparableType")
 public class ByteList implements Comparable, CharSequence, Serializable {
     private static final long serialVersionUID = -1286166947275543731L;
-
-    private static final VarHandle BYTES_AS_LONGS =
-            MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.nativeOrder());
 
     public static final byte[] NULL_ARRAY = new byte[0];
     public static final ByteList EMPTY_BYTELIST = new ByteList(NULL_ARRAY, false);
@@ -990,16 +984,8 @@ public class ByteList implements Comparable, CharSequence, Serializable {
 
         if (realSize < Long.BYTES) return equalShort(buf, begin, otherBuf, otherBegin, realSize);
 
-        // Compare a long (8 bytes) at a time. The last and first longs are checked first, so
-        // strings that differ near either end are rejected quickly, as in equalShort below.
-        // The loop then checks the longs in between. The last long may overlap the one before it.
-        int tail = realSize - Long.BYTES;
-        if ((long) BYTES_AS_LONGS.get(buf, begin + tail) != (long) BYTES_AS_LONGS.get(otherBuf, otherBegin + tail)) return false;
-        if ((long) BYTES_AS_LONGS.get(buf, begin) != (long) BYTES_AS_LONGS.get(otherBuf, otherBegin)) return false;
-        for (int i = Long.BYTES; i < tail; i += Long.BYTES) {
-            if ((long) BYTES_AS_LONGS.get(buf, begin + i) != (long) BYTES_AS_LONGS.get(otherBuf, otherBegin + i)) return false;
-        }
-        return true;
+        // Arrays.equals is a JIT intrinsic that compares many bytes at a time (SIMD on x86).
+        return Arrays.equals(buf, begin, begin + realSize, otherBuf, otherBegin, otherBegin + realSize);
     }
 
     // scanning from front and back simultaneously, meeting in
