@@ -1,0 +1,74 @@
+name: ByteList#equal benchmark
+
+# Compares ByteList#equal implementations (jruby/jruby#10078) on x86_64
+# Windows, Alpine (musl) and Ubuntu (glibc). Results are in each job's summary.
+
+on:
+  push:
+    paths:
+      - 'bench/java/ByteListEqualBench.java'
+      - '.github/workflows/bytelist-equal-bench.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [21, 25]
+    runs-on: windows-latest
+    name: Windows x64, Java ${{ matrix.java }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java }}
+      - name: cpu
+        shell: pwsh
+        run: Get-CimInstance Win32_Processor | Select-Object Name, NumberOfCores, NumberOfLogicalProcessors | Format-List
+      - name: benchmark
+        run: |
+          javac -d out bench/java/ByteListEqualBench.java
+          java -cp out ByteListEqualBench
+
+  alpine:
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [21, 25]
+    runs-on: ubuntu-latest
+    name: Alpine x64, Java ${{ matrix.java }}
+    steps:
+      - uses: actions/checkout@v6
+      # JavaScript actions do not run in musl containers, so run the container directly.
+      - name: benchmark
+        run: |
+          docker run --rm -v "$PWD:/w" -w /w \
+            -v "$GITHUB_STEP_SUMMARY:/summary" -e GITHUB_STEP_SUMMARY=/summary \
+            eclipse-temurin:${{ matrix.java }}-jdk-alpine sh -c '
+              uname -m && cat /etc/alpine-release && grep -m1 "model name" /proc/cpuinfo &&
+              javac -d /tmp/out bench/java/ByteListEqualBench.java &&
+              java -cp /tmp/out ByteListEqualBench'
+
+  ubuntu:
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [21, 25]
+    runs-on: ubuntu-latest
+    name: Ubuntu x64, Java ${{ matrix.java }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-java@v6
+        with:
+          distribution: 'temurin'
+          java-version: ${{ matrix.java }}
+      - name: benchmark
+        run: |
+          grep -m1 "model name" /proc/cpuinfo
+          javac -d out bench/java/ByteListEqualBench.java
+          java -cp out ByteListEqualBench
