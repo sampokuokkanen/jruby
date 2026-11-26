@@ -851,13 +851,11 @@ public class Sprintf {
                     }
 
                     int numlen = bytes.length - first;
-                    switch (fchar) {
-                    case 'd': case 'i': case 'u':
-                        // If the precision is 0 and the value is 0, nothing is written.
-                        if ((flags & FLAG_PRECISION) != 0 && precision == 0 && zero) {
-                            numlen = 0;
-                        }
-                    }
+                    // Zero with precision 0 prints no digits ("%.0x" % 0 is "").
+                    // %#o is the exception: its "0" prefix is the digit itself.
+                    boolean zeroPrecision = (flags & FLAG_PRECISION) != 0 && precision == 0;
+                    boolean sharpOctal = fchar == 'o' && (flags & FLAG_SHARP) != 0;
+                    if (zero && zeroPrecision && prefix == null && !sharpOctal) numlen = 0;
 
                     len += numlen;
 
