@@ -93,7 +93,7 @@ public class FiberQueue {
 
     // MRI's fiber_switch does not check interrupts while waiting for control; the fiber running now takes them,
     // and this one checks once it has control. A finalized fiber is shut down and takes the kill sent to it.
-    @CRuby(value = "fiber_switch", file = "cont.c")
+    @CRuby(value = "fiber_switch", file = "cont.c", note = "waiting for control")
     public FiberRequest pop(ThreadContext context) {
         while (true) {
             try {
