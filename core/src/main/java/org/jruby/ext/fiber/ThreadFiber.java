@@ -684,7 +684,7 @@ public class ThreadFiber extends RubyObject implements ExecutionContext {
                             // passing the kill on would wake a fiber that transferred away while another one runs.
                         } else if (data.parent.isKilled()) {
                             // MRI: rb_fiber_start hands a Thread#kill on to the next fiber, so the whole thread dies.
-                            pushToReturnFiber(ctxt, data, new FiberRequest(tk, RequestType.RAISE));
+                            raiseInReturnFiber(ctxt, data, tk);
                         } else {
                             // Only this fiber's own thread was killed: end like Fiber#kill
                             pushToReturnFiber(ctxt, data, new FiberRequest(ctxt.nil, RequestType.DATA));
