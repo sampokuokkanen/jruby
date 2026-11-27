@@ -259,15 +259,10 @@ public class ThreadFiber extends RubyObject implements ExecutionContext {
         targetFiberData.queue.push(context, request);
 
         // While we wait, the fiber we switched to takes Thread#raise and Thread#kill; pop does not check for them.
-        // An exception out of pop (our queue shut down) is still handed to the fiber if it can take it.
+        // pop only raises when our queue was shut down, and then the exception is ours.
 
         FiberRequest result;
         try {
-            result = currentFiberData.queue.pop(context);
-        } catch (RaiseException re) {
-            handleExceptionDuringExchange(context, currentFiberData, targetFiberData, re);
-
-            // if we get here, we forwarded exception so try once more
             result = currentFiberData.queue.pop(context);
         } finally {
             // MRI: fiber_switch re-reads the current fiber; control can return into a different one
@@ -286,52 +281,6 @@ public class ThreadFiber extends RubyObject implements ExecutionContext {
         if (checkKilled && currentFiberData.killed) throw new FiberKill();
 
         return result;
-    }
-
-    /**
-     * Handle exceptions raised while exchanging data with a fiber.
-     *
-     * The rules work like this:
-     *
-     * <ul>
-     *     <li>If the thread has called Fiber#resume on the fiber and an interrupt is sent to the thread,
-     *     forward it to the fiber</li>
-     *     <li>If the fiber has called Fiber.yield and an interrupt is sent to the fiber (e.g. Timeout.timeout(x) { Fiber.yield })
-     *     forward it to the fiber's parent thread.</li>
-     * </ul>
-     *
-     * @param context
-     * @param currentFiberData
-     * @param targetFiberData
-     * @param re
-     */
-    private static void handleExceptionDuringExchange(ThreadContext context, FiberData currentFiberData, FiberData targetFiberData, RaiseException re) {
-        // If we received a LJC we need to bubble it out
-        if (context.runtime.getLocalJumpError().isInstance(re.getException())) {
-            throw re;
-        }
-
-        // If we were trying to yield but our queue has been shut down,
-        // let the exception bubble out and (ideally) kill us.
-        if (currentFiberData.queue.isShutdown()) {
-            throw re;
-        }
-
-        // re-raise if the target fiber has been shut down
-        if (targetFiberData.queue.isShutdown()) {
-            throw re;
-        }
-
-        // Otherwise, we want to forward the exception to the target fiber
-        // since it has the ball
-        final ThreadFiber fiber = targetFiberData.fiber.get();
-        final RubyThread fiberThread = fiber == null ? null : fiber.thread;
-        if ( fiberThread != null && fiber.alive() ) {
-            fiberThread.raise(re.getException());
-        } else {
-            // target fiber has gone away, it's our ball now
-            throw re;
-        }
     }
 
     @JRubyMethod(rest = true)
